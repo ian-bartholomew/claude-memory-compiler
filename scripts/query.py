@@ -16,10 +16,8 @@ import argparse
 import asyncio
 from pathlib import Path
 
-from config import KNOWLEDGE_DIR, QA_DIR, now_iso
+from config import INDEX_FILE, LOG_FILE, QA_DIR, VAULT_DIR, WIKI_DIR, _is_external_vault, now_iso, today_iso
 from utils import load_state, read_all_wiki_content, save_state
-
-ROOT_DIR = Path(__file__).resolve().parent.parent
 
 
 async def run_query(question: str, file_back: bool = False) -> str:
@@ -41,7 +39,38 @@ async def run_query(question: str, file_back: bool = False) -> str:
     file_back_instructions = ""
     if file_back:
         timestamp = now_iso()
-        file_back_instructions = f"""
+        date_stamp = today_iso()
+        if _is_external_vault:
+            file_back_instructions = f"""
+
+## File Back Instructions
+
+After answering, do the following:
+1. Create a Q&A article at {QA_DIR}/ with the filename being a slugified version
+   of the question (e.g., wiki/qa/how-to-handle-auth-redirects.md)
+2. Use this frontmatter schema for the Q&A article:
+   ```yaml
+   title: "Q: question summary"
+   domain: [relevant-domain]
+   maturity: developing
+   confidence: medium
+   type: qa
+   question: "The exact question"
+   consulted:
+     - "[[article-1]]"
+     - "[[article-2]]"
+   last_compiled: {date_stamp}
+   ```
+3. Use bare [[slug]] wikilinks (not [[concepts/slug]] style)
+4. Update {INDEX_FILE} — add a row in the "Recently Compiled" section
+5. Append to {LOG_FILE}:
+   ## [{date_stamp}] query (filed) | question summary
+   - Question: {question}
+   - Consulted: [[list of articles read]]
+   - Filed to: [[qa/article-name]]
+"""
+        else:
+            file_back_instructions = f"""
 
 ## File Back Instructions
 
@@ -50,13 +79,18 @@ After answering, do the following:
    of the question (e.g., knowledge/qa/how-to-handle-auth-redirects.md)
 2. Use the Q&A article format from the schema (frontmatter with title, question,
    consulted articles, filed date)
-3. Update {KNOWLEDGE_DIR / 'index.md'} with a new row for this Q&A article
-4. Append to {KNOWLEDGE_DIR / 'log.md'}:
+3. Update {INDEX_FILE} with a new row for this Q&A article
+4. Append to {LOG_FILE}:
    ## [{timestamp}] query (filed) | question summary
    - Question: {question}
    - Consulted: [[list of articles read]]
    - Filed to: [[qa/article-name]]
 """
+
+    if _is_external_vault:
+        citation_guidance = "5. Cite your sources using bare [[wikilinks]] (e.g., [[supabase-auth]]), not path-prefixed links"
+    else:
+        citation_guidance = "5. Cite your sources using [[wikilinks]] (e.g., [[concepts/supabase-auth]])"
 
     prompt = f"""You are a knowledge base query engine. Answer the user's question by
 consulting the knowledge base below.
@@ -67,7 +101,7 @@ consulting the knowledge base below.
 2. Identify 3-10 articles that are relevant to the question
 3. Read those articles carefully (they're included below)
 4. Synthesize a clear, thorough answer
-5. Cite your sources using [[wikilinks]] (e.g., [[concepts/supabase-auth]])
+{citation_guidance}
 6. If the knowledge base doesn't contain relevant information, say so honestly
 
 ## Knowledge Base
@@ -86,7 +120,7 @@ consulting the knowledge base below.
         async for message in query(
             prompt=prompt,
             options=ClaudeAgentOptions(
-                cwd=str(ROOT_DIR),
+                cwd=str(VAULT_DIR),
                 system_prompt={"type": "preset", "preset": "claude_code"},
                 allowed_tools=tools,
                 permission_mode="acceptEdits",
@@ -131,7 +165,7 @@ def main():
     if args.file_back:
         print("\n" + "-" * 60)
         qa_count = len(list(QA_DIR.glob("*.md"))) if QA_DIR.exists() else 0
-        print(f"Answer filed to knowledge/qa/ ({qa_count} Q&A articles total)")
+        print(f"Answer filed to {QA_DIR}/ ({qa_count} Q&A articles total)")
 
 
 if __name__ == "__main__":
