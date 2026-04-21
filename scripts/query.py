@@ -35,6 +35,8 @@ async def run_query(question: str, file_back: bool = False) -> str:
     tools = ["Read", "Glob", "Grep"]
     if file_back:
         tools.extend(["Write", "Edit"])
+    if _is_external_vault:
+        tools.append("Bash")
 
     file_back_instructions = ""
     if file_back:
@@ -62,12 +64,20 @@ After answering, do the following:
    last_compiled: {date_stamp}
    ```
 3. Use bare [[slug]] wikilinks (not [[concepts/slug]] style)
-4. Update {INDEX_FILE} — add a row in the "Recently Compiled" section
-5. Append to {LOG_FILE}:
+4. Use Obsidian-flavored Markdown: [[wikilinks]], callouts (> [!note]), ==highlights==
+5. Update {INDEX_FILE} — add a row in the "Recently Compiled" section
+6. Append to {LOG_FILE}:
    ## [{date_stamp}] query (filed) | question summary
    - Question: {question}
    - Consulted: [[list of articles read]]
    - Filed to: [[qa/article-name]]
+
+### Obsidian Tooling
+
+You have access to the `obsidian` CLI. **Prefer it over raw Write/Edit** for vault ops:
+- `obsidian create name="slug" content="..." path="wiki/qa/"` — create the Q&A article
+- `obsidian append file="wiki/_log" content="..."` — append to the log
+- Fall back to Write/Edit if the CLI is unavailable.
 """
         else:
             file_back_instructions = f"""

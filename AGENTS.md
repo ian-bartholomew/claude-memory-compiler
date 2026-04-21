@@ -361,9 +361,47 @@ Maturity is tracked in frontmatter (`maturity: draft | developing | mature`). Co
 
 - **Bare `[[kebab-case]]`** — No path prefixes. Write `[[circuit-breaker]]`, not `[[concepts/circuit-breaker]]`.
 - **No `.md` extension** — Write `[[slug]]`, not `[[slug.md]]`.
+- **Display text** — `[[slug|Display Text]]` for custom link text.
+- **Heading links** — `[[slug#Heading]]` to link to a specific section.
 - **Kebab-case filenames** — All wiki articles use lowercase hyphenated names (e.g., `circuit-breaker.md`, `graceful-degradation.md`).
 - **Writing style** — Encyclopedia-style, factual, third-person where appropriate.
 - **Dates** — ISO 8601 (`YYYY-MM-DD`).
+
+---
+
+## Obsidian Tooling
+
+The vault is an Obsidian vault. All compile and query agents have access to the `obsidian` CLI and should use Obsidian-flavored Markdown.
+
+### Obsidian CLI
+
+The `obsidian` command-line tool talks to a running Obsidian instance. **Prefer it over raw Write/Edit** for vault operations — it ensures Obsidian's indexes, backlinks, and cache stay in sync.
+
+Key commands:
+
+| Command | Purpose | Example |
+|---------|---------|---------|
+| `obsidian create` | Create a new note | `obsidian create name="slug" content="..." path="wiki/concepts/"` |
+| `obsidian read` | Read a note | `obsidian read file="slug"` |
+| `obsidian append` | Append to a note | `obsidian append file="wiki/_log" content="..."` |
+| `obsidian search` | Search the vault | `obsidian search query="term" limit=10` |
+| `obsidian backlinks` | Show backlinks | `obsidian backlinks file="slug"` |
+| `obsidian unresolved` | List broken links | `obsidian unresolved` |
+| `obsidian property:set` | Set frontmatter property | `obsidian property:set file="slug" property="maturity" value="mature"` |
+
+If Obsidian is not running, fall back to raw `Write`/`Edit` tools.
+
+### Obsidian Markdown
+
+Use Obsidian-flavored Markdown throughout all wiki articles:
+
+- **Wikilinks:** `[[slug]]` for internal links, `[[slug|display text]]` for custom display
+- **Embeds:** `![[slug]]` to embed a note, `![[image.png]]` for images
+- **Callouts:** `> [!note]`, `> [!tip]`, `> [!warning]` for highlighted information
+- **Tags:** `#tag` inline or `tags: [tag1, tag2]` in frontmatter
+- **Highlights:** `==highlighted text==` for emphasis
+- **Properties:** YAML frontmatter at the top of every file (required)
+- **Block IDs:** `^block-id` to create linkable blocks
 
 ---
 
@@ -630,7 +668,7 @@ async for message in query(
     options=ClaudeAgentOptions(
         cwd=str(VAULT_DIR),
         system_prompt={"type": "preset", "preset": "claude_code"},
-        allowed_tools=["Read", "Write", "Edit", "Glob", "Grep"],
+        allowed_tools=["Read", "Write", "Edit", "Glob", "Grep", "Bash"],
         permission_mode="acceptEdits",
         max_turns=30,
     ),
@@ -639,6 +677,7 @@ async for message in query(
 
 - Builds a prompt with: AGENTS.md schema, current `_index.md`, domain indexes, all existing articles, and the daily log
 - Claude reads the daily log, decides what concepts to extract, and writes files directly to the vault
+- `Bash` tool included so the agent can use the `obsidian` CLI for vault-aware operations
 - `permission_mode="acceptEdits"` auto-approves all file operations
 - `cwd` is set to `VAULT_DIR` so file operations target the vault, not the compiler repo
 - Incremental: tracks SHA-256 hashes of daily logs in `state.json`, skips unchanged files

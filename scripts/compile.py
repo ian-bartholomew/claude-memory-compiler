@@ -239,6 +239,28 @@ Use bare `[[kebab-case-slug]]` wikilinks — NO path prefixes. Examples:
 - Domain indexes: {INDEXES_DIR}/
 - Build log: {LOG_FILE}
 
+### Obsidian Tooling
+
+You have access to the `obsidian` CLI which talks to the running Obsidian instance. **Prefer
+the Obsidian CLI over raw Write/Edit** for vault operations when possible:
+
+- **Create articles:** `obsidian create name="article-slug" content="..." path="wiki/concepts/"`
+- **Append to log:** `obsidian append file="wiki/_log" content="..."`
+- **Read articles:** `obsidian read file="article-slug"`
+- **Search vault:** `obsidian search query="term" limit=10`
+
+If the Obsidian CLI is not available (e.g., Obsidian is not running), fall back to Write/Edit.
+
+### Obsidian Markdown Conventions
+
+Use Obsidian-flavored Markdown throughout:
+- **Wikilinks:** `[[slug]]` for internal links, `[[slug|display text]]` for custom display
+- **Heading links:** `[[slug#Heading]]` to link to a specific section
+- **Tags:** `#tag` inline or `tags: [tag1, tag2]` in frontmatter
+- **Callouts:** `> [!note]`, `> [!tip]`, `> [!warning]` for highlighted information
+- **Properties:** YAML frontmatter at the top of every file
+- **Highlights:** `==highlighted text==` for emphasis
+
 ### Quality standards:
 - Every article must have complete YAML frontmatter in the format above
 - Every article must reference at least 2 related articles via `related:` frontmatter
@@ -297,8 +319,10 @@ async def compile_daily_log(log_path: Path, state: dict) -> float:
 
     if _is_external_vault:
         prompt = _build_vault_prompt(**prompt_args)
+        tools = ["Read", "Write", "Edit", "Glob", "Grep", "Bash"]
     else:
         prompt = _build_default_prompt(**prompt_args)
+        tools = ["Read", "Write", "Edit", "Glob", "Grep"]
 
     cost = 0.0
 
@@ -308,7 +332,7 @@ async def compile_daily_log(log_path: Path, state: dict) -> float:
             options=ClaudeAgentOptions(
                 cwd=str(VAULT_DIR),
                 system_prompt={"type": "preset", "preset": "claude_code"},
-                allowed_tools=["Read", "Write", "Edit", "Glob", "Grep"],
+                allowed_tools=tools,
                 permission_mode="acceptEdits",
                 max_turns=30,
             ),
