@@ -49,7 +49,6 @@ VAULT_DIR = _resolve_vault_dir()
 
 
 # ── Vault paths (where the data lives) ───────────────────────────────
-DAILY_DIR = VAULT_DIR / "daily"
 
 # Wiki structure — adapts to vault layout
 # External vault: wiki/ with _index.md, _log.md, _indexes/
@@ -57,10 +56,15 @@ DAILY_DIR = VAULT_DIR / "daily"
 _is_external_vault = VAULT_DIR != COMPILER_DIR
 
 if _is_external_vault:
+    # External vault uses the Karpathy three-layer architecture:
+    #   raw/   (source)  →  wiki/  (compiled)  →  projects/  (active work)
+    # Daily conversation logs are raw source material, so they go in raw/daily/.
+    DAILY_DIR = VAULT_DIR / "raw" / "daily"
     WIKI_DIR = VAULT_DIR / "wiki"
     INDEX_FILE = WIKI_DIR / "_index.md"
     LOG_FILE = WIKI_DIR / "_log.md"
 else:
+    DAILY_DIR = VAULT_DIR / "daily"
     WIKI_DIR = VAULT_DIR / "knowledge"
     INDEX_FILE = WIKI_DIR / "index.md"
     LOG_FILE = WIKI_DIR / "log.md"

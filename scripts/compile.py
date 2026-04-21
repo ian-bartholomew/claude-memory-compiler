@@ -189,7 +189,7 @@ domain: [primary-domain]
 maturity: developing
 confidence: medium
 compiled_from:
-  - "daily/{log_path.name}"
+  - "raw/daily/{log_path.name}"
 related:
   - "[[related-slug]]"
 last_compiled: {date_today}
@@ -228,7 +228,7 @@ Use bare `[[kebab-case-slug]]` wikilinks — NO path prefixes. Examples:
 7. **Append to wiki/_log.md** — Add a timestamped entry:
    ```
    ## [{date_today}] compile | Article Title
-   - Source: daily/{log_path.name}
+   - Source: raw/daily/{log_path.name}
    - Created: [[slug-a]], [[slug-b]]
    - Updated: [[slug-c]] (if any)
    ```
