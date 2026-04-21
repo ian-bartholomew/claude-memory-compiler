@@ -18,7 +18,20 @@ import asyncio
 import sys
 from pathlib import Path
 
-from config import AGENTS_FILE, CONCEPTS_DIR, CONNECTIONS_DIR, DAILY_DIR, KNOWLEDGE_DIR, now_iso
+from config import (
+    AGENTS_FILE,
+    ARTICLE_SUBDIRS,
+    COMPILER_DIR,
+    DAILY_DIR,
+    INDEX_FILE,
+    INDEXES_DIR,
+    LOG_FILE,
+    VAULT_DIR,
+    WIKI_DIR,
+    _is_external_vault,
+    now_iso,
+    today_iso,
+)
 from utils import (
     file_hash,
     list_raw_files,
@@ -28,43 +41,22 @@ from utils import (
     save_state,
 )
 
-# ── Paths for the LLM to use ──────────────────────────────────────────
-ROOT_DIR = Path(__file__).resolve().parent.parent
+
+# ── Prompt builders ──────────────────────────────────────────────────
 
 
-async def compile_daily_log(log_path: Path, state: dict) -> float:
-    """Compile a single daily log into knowledge articles.
+def _build_default_prompt(
+    schema: str,
+    wiki_index: str,
+    existing_articles_context: str,
+    log_path: Path,
+    log_content: str,
+    timestamp: str,
+) -> str:
+    """Build the compilation prompt for the original single-repo layout."""
+    from config import CONCEPTS_DIR, CONNECTIONS_DIR
 
-    Returns the API cost of the compilation.
-    """
-    from claude_agent_sdk import (
-        AssistantMessage,
-        ClaudeAgentOptions,
-        ResultMessage,
-        TextBlock,
-        query,
-    )
-
-    log_content = log_path.read_text(encoding="utf-8")
-    schema = AGENTS_FILE.read_text(encoding="utf-8")
-    wiki_index = read_wiki_index()
-
-    # Read existing articles for context
-    existing_articles_context = ""
-    existing = {}
-    for article_path in list_wiki_articles():
-        rel = article_path.relative_to(KNOWLEDGE_DIR)
-        existing[str(rel)] = article_path.read_text(encoding="utf-8")
-
-    if existing:
-        parts = []
-        for rel_path, content in existing.items():
-            parts.append(f"### {rel_path}\n```markdown\n{content}\n```")
-        existing_articles_context = "\n\n".join(parts)
-
-    timestamp = now_iso()
-
-    prompt = f"""You are a knowledge compiler. Your job is to read a daily conversation log
+    return f"""You are a knowledge compiler. Your job is to read a daily conversation log
 and extract knowledge into structured wiki articles.
 
 ## Schema (AGENTS.md)
@@ -114,8 +106,8 @@ Read the daily log above and compile it into wiki articles following the schema 
 ### File paths:
 - Write concept articles to: {CONCEPTS_DIR}
 - Write connection articles to: {CONNECTIONS_DIR}
-- Update index at: {KNOWLEDGE_DIR / 'index.md'}
-- Append log at: {KNOWLEDGE_DIR / 'log.md'}
+- Update index at: {WIKI_DIR / 'index.md'}
+- Append log at: {WIKI_DIR / 'log.md'}
 
 ### Quality standards:
 - Every article must have complete YAML frontmatter
@@ -126,13 +118,195 @@ Read the daily log above and compile it into wiki articles following the schema 
 - Sources section should cite the daily log with specific claims extracted
 """
 
+
+def _build_vault_prompt(
+    schema: str,
+    wiki_index: str,
+    existing_articles_context: str,
+    log_path: Path,
+    log_content: str,
+    timestamp: str,
+) -> str:
+    """Build the compilation prompt for an external Obsidian vault."""
+    date_today = today_iso()
+
+    # Read domain indexes for extra context
+    domain_index_context = ""
+    if INDEXES_DIR.exists():
+        parts = []
+        for idx_file in sorted(INDEXES_DIR.glob("*.md")):
+            content = idx_file.read_text(encoding="utf-8")
+            parts.append(f"### {idx_file.stem}.md\n```markdown\n{content}\n```")
+        if parts:
+            domain_index_context = "\n\n".join(parts)
+
+    return f"""You are a knowledge compiler for an Obsidian vault. Your job is to read a daily
+conversation log and extract knowledge into structured wiki articles following the vault's
+conventions exactly.
+
+## Schema (AGENTS.md)
+
+{schema}
+
+## Current Master Index (wiki/_index.md)
+
+{wiki_index}
+
+## Domain Indexes (wiki/_indexes/)
+
+{domain_index_context if domain_index_context else "(No domain indexes yet)"}
+
+## Existing Wiki Articles
+
+{existing_articles_context if existing_articles_context else "(No existing articles yet)"}
+
+## Daily Log to Compile
+
+**File:** {log_path.name}
+
+{log_content}
+
+## Your Task
+
+Read the daily log above and compile it into wiki articles for this Obsidian vault.
+
+### Article Placement
+
+Place articles in the correct subdirectory based on content type:
+- `wiki/concepts/` — "What is X?" — atomic knowledge, patterns, decisions, technical concepts
+- `wiki/guides/` — "How do I X?" — step-by-step procedures, runbooks, tutorials
+- `wiki/company/` — Organization-specific knowledge (Fanatics, team processes, internal tools)
+- `wiki/learning/` — Books, courses, conferences, learning resources
+
+### Frontmatter Format
+
+Every article MUST use this exact YAML frontmatter structure:
+
+```yaml
+---
+title: "Article Title"
+domain: [primary-domain]
+maturity: developing
+confidence: medium
+compiled_from:
+  - "daily/{log_path.name}"
+related:
+  - "[[related-slug]]"
+last_compiled: {date_today}
+---
+```
+
+- **domain**: One or more of: `sre`, `engineering`, `observability`, `infrastructure`, `databases`, `fanatics`, `learning`
+- **maturity**: Default to `developing` for new articles. Use `draft` only for very thin content. Set `mature` only when updating an already substantial article.
+- **confidence**: Default to `medium` for new articles. Use `high` only for well-established facts.
+- **compiled_from**: List of daily log files that contributed to this article
+- **related**: List of bare `[[slug]]` wikilinks to related articles
+- **last_compiled**: Today's date: `{date_today}`
+
+### Wikilink Convention
+
+Use bare `[[kebab-case-slug]]` wikilinks — NO path prefixes. Examples:
+- Correct: `[[circuit-breaker-pattern]]`
+- Wrong: `[[concepts/circuit-breaker-pattern]]`
+
+### Rules
+
+1. **Extract key concepts** — Identify 3-7 distinct topics worth their own article
+2. **Create articles** in the appropriate subdirectory (concepts/, guides/, company/, or learning/)
+3. **Update existing articles** if this log adds information to topics already in the wiki
+   - Add the daily log to `compiled_from:` frontmatter
+   - Update `last_compiled:` to `{date_today}`
+   - Add new related links to `related:` frontmatter
+4. **NO connection articles** — Express relationships via `related:` frontmatter field instead
+5. **Update wiki/_index.md** — Add new articles to the "Recently Compiled" section:
+   ```
+   - [[slug]] — one-line summary (compiled {date_today})
+   ```
+6. **Update the relevant domain index** in `wiki/_indexes/` — Add entries to the matching
+   domain file (e.g., `wiki/_indexes/sre.md` for SRE articles). Create the domain index file
+   if it doesn't exist.
+7. **Append to wiki/_log.md** — Add a timestamped entry:
+   ```
+   ## [{date_today}] compile | Article Title
+   - Source: daily/{log_path.name}
+   - Created: [[slug-a]], [[slug-b]]
+   - Updated: [[slug-c]] (if any)
+   ```
+
+### File paths:
+- Article directories: wiki/concepts/, wiki/guides/, wiki/company/, wiki/learning/
+- Master index: {INDEX_FILE}
+- Domain indexes: {INDEXES_DIR}/
+- Build log: {LOG_FILE}
+
+### Quality standards:
+- Every article must have complete YAML frontmatter in the format above
+- Every article must reference at least 2 related articles via `related:` frontmatter
+- Use bare `[[slug]]` wikilinks throughout article body text
+- Key Points section should have 3-5 bullet points
+- Details section should have 2+ paragraphs
+- Write in encyclopedia style — factual, concise, self-contained
+- Sources section should cite the daily log with specific claims extracted
+"""
+
+
+# ── Compilation ──────────────────────────────────────────────────────
+
+
+async def compile_daily_log(log_path: Path, state: dict) -> float:
+    """Compile a single daily log into knowledge articles.
+
+    Returns the API cost of the compilation.
+    """
+    from claude_agent_sdk import (
+        AssistantMessage,
+        ClaudeAgentOptions,
+        ResultMessage,
+        TextBlock,
+        query,
+    )
+
+    log_content = log_path.read_text(encoding="utf-8")
+    schema = AGENTS_FILE.read_text(encoding="utf-8")
+    wiki_index = read_wiki_index()
+
+    # Read existing articles for context
+    existing_articles_context = ""
+    existing = {}
+    for article_path in list_wiki_articles():
+        rel = article_path.relative_to(WIKI_DIR)
+        existing[str(rel)] = article_path.read_text(encoding="utf-8")
+
+    if existing:
+        parts = []
+        for rel_path, content in existing.items():
+            parts.append(f"### {rel_path}\n```markdown\n{content}\n```")
+        existing_articles_context = "\n\n".join(parts)
+
+    timestamp = now_iso()
+
+    # Select prompt based on vault mode
+    prompt_args = dict(
+        schema=schema,
+        wiki_index=wiki_index,
+        existing_articles_context=existing_articles_context,
+        log_path=log_path,
+        log_content=log_content,
+        timestamp=timestamp,
+    )
+
+    if _is_external_vault:
+        prompt = _build_vault_prompt(**prompt_args)
+    else:
+        prompt = _build_default_prompt(**prompt_args)
+
     cost = 0.0
 
     try:
         async for message in query(
             prompt=prompt,
             options=ClaudeAgentOptions(
-                cwd=str(ROOT_DIR),
+                cwd=str(VAULT_DIR),
                 system_prompt={"type": "preset", "preset": "claude_code"},
                 allowed_tools=["Read", "Write", "Edit", "Glob", "Grep"],
                 permission_mode="acceptEdits",
@@ -178,8 +352,8 @@ def main():
         if not target.is_absolute():
             target = DAILY_DIR / target.name
         if not target.exists():
-            # Try resolving relative to project root
-            target = ROOT_DIR / args.file
+            # Try resolving relative to vault root
+            target = VAULT_DIR / args.file
         if not target.exists():
             print(f"Error: {args.file} not found")
             sys.exit(1)
