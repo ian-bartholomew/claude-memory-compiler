@@ -15,11 +15,12 @@ import argparse
 import asyncio
 from pathlib import Path
 
-from config import KNOWLEDGE_DIR, REPORTS_DIR, now_iso, today_iso
+from config import REPORTS_DIR, VAULT_DIR, WIKI_DIR, _is_external_vault, now_iso, today_iso
 from utils import (
     count_inbound_links,
     extract_wikilinks,
     file_hash,
+    find_article_path,
     get_article_word_count,
     list_raw_files,
     list_wiki_articles,
@@ -29,18 +30,20 @@ from utils import (
     wiki_article_exists,
 )
 
-ROOT_DIR = Path(__file__).resolve().parent.parent
-
 
 def check_broken_links() -> list[dict]:
     """Check for [[wikilinks]] that point to non-existent articles."""
     issues = []
     for article in list_wiki_articles():
         content = article.read_text(encoding="utf-8")
-        rel = article.relative_to(KNOWLEDGE_DIR)
+        rel = article.relative_to(WIKI_DIR)
         for link in extract_wikilinks(content):
             if link.startswith("daily/"):
                 continue  # daily log references are valid
+            if link.startswith("raw/"):
+                continue  # raw source references are valid
+            if (WIKI_DIR / "_indexes" / f"{link}.md").exists():
+                continue  # domain index names (e.g. sre, engineering)
             if not wiki_article_exists(link):
                 issues.append({
                     "severity": "error",
@@ -55,8 +58,11 @@ def check_orphan_pages() -> list[dict]:
     """Check for articles with zero inbound links."""
     issues = []
     for article in list_wiki_articles():
-        rel = article.relative_to(KNOWLEDGE_DIR)
-        link_target = str(rel).replace(".md", "").replace("\\", "/")
+        rel = article.relative_to(WIKI_DIR)
+        if _is_external_vault:
+            link_target = article.stem  # bare slug for bare wikilinks
+        else:
+            link_target = str(rel).replace(".md", "").replace("\\", "/")
         inbound = count_inbound_links(link_target)
         if inbound == 0:
             issues.append({
@@ -109,14 +115,17 @@ def check_missing_backlinks() -> list[dict]:
     issues = []
     for article in list_wiki_articles():
         content = article.read_text(encoding="utf-8")
-        rel = article.relative_to(KNOWLEDGE_DIR)
-        source_link = str(rel).replace(".md", "").replace("\\", "/")
+        rel = article.relative_to(WIKI_DIR)
+        if _is_external_vault:
+            source_link = article.stem  # bare slug
+        else:
+            source_link = str(rel).replace(".md", "").replace("\\", "/")
 
         for link in extract_wikilinks(content):
             if link.startswith("daily/"):
                 continue
-            target_path = KNOWLEDGE_DIR / f"{link}.md"
-            if target_path.exists():
+            target_path = find_article_path(link)
+            if target_path is not None and target_path.exists():
                 target_content = target_path.read_text(encoding="utf-8")
                 if f"[[{source_link}]]" not in target_content:
                     issues.append({
@@ -135,7 +144,7 @@ def check_sparse_articles() -> list[dict]:
     for article in list_wiki_articles():
         word_count = get_article_word_count(article)
         if word_count < 200:
-            rel = article.relative_to(KNOWLEDGE_DIR)
+            rel = article.relative_to(WIKI_DIR)
             issues.append({
                 "severity": "suggestion",
                 "check": "sparse_article",
@@ -184,7 +193,7 @@ Do NOT output anything else - no preamble, no explanation, just the formatted li
         async for message in query(
             prompt=prompt,
             options=ClaudeAgentOptions(
-                cwd=str(ROOT_DIR),
+                cwd=str(VAULT_DIR),
                 allowed_tools=[],
                 max_turns=2,
             ),
