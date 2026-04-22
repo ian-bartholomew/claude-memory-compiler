@@ -180,13 +180,14 @@ Use bare `[[kebab-case-slug]]` wikilinks — NO path prefixes. Examples:
 1. **Extract key concepts** — Identify distinct topics worth their own article (typically 1-5
    per meeting, but 0 is fine for lightweight meetings)
 2. **Create articles** in the appropriate subdirectory
-3. **Update existing articles** if this meeting adds information to topics already in the wiki
+3. **NO connection articles** — Express relationships via `related:` frontmatter field instead
+4. **Update existing articles** if this meeting adds information to topics already in the wiki
    - Add the meeting summary to `compiled_from:` frontmatter
    - Update `last_compiled:` to `{date_today}`
    - Merge new information into the article body
-4. **Update wiki/_index.md** — Add new articles to the "Recently Compiled" section
-5. **Update the relevant domain index** in `wiki/_indexes/`
-6. **Append to wiki/_log.md** — Add a timestamped entry:
+5. **Update wiki/_index.md** — Add new articles to the "Recently Compiled" section
+6. **Update the relevant domain index** in `wiki/_indexes/`
+7. **Append to wiki/_log.md** — Add a timestamped entry:
    ```
    ## [{date_today}] meeting-compile | Article Title
    - Source: meetings/{meeting_dir.name}/summary-*.md
@@ -220,6 +221,7 @@ If the Obsidian CLI is not available, fall back to Write/Edit.
 - Key Points section should have 3-5 bullet points
 - Details section should have 2+ paragraphs
 - Write in encyclopedia style — factual, concise, self-contained
+- Sources section should cite the meeting summary with specific claims extracted
 """
 
 
