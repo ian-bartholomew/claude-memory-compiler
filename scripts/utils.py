@@ -11,6 +11,7 @@ from config import (
     INDEX_FILE,
     INDEXES_DIR,
     LOG_FILE,
+    MEETINGS_DIR,
     STATE_FILE,
     WIKI_DIR,
     _is_external_vault,
@@ -147,6 +148,48 @@ def list_raw_files() -> list[Path]:
     if not DAILY_DIR.exists():
         return []
     return sorted(DAILY_DIR.glob("*.md"))
+
+
+# ── Meeting helpers ──────────────────────────────────────────────────
+
+
+def list_meeting_dirs() -> list[Path]:
+    """List meeting directories matching YYYY-MM-DD-* pattern."""
+    if not MEETINGS_DIR.exists():
+        return []
+    return sorted(
+        d for d in MEETINGS_DIR.iterdir()
+        if d.is_dir() and re.match(r"\d{4}-\d{2}-\d{2}-", d.name)
+    )
+
+
+def list_meeting_summaries(meeting_dir: Path) -> list[Path]:
+    """List summary-*.md files in a meeting directory."""
+    return sorted(meeting_dir.glob("summary-*.md"))
+
+
+def read_meeting_metadata(meeting_dir: Path) -> dict:
+    """Read _metadata.json from a meeting directory. Returns {} if missing."""
+    meta_file = meeting_dir / "_metadata.json"
+    if not meta_file.exists():
+        return {}
+    try:
+        return json.loads(meta_file.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def meeting_hash(meeting_dir: Path) -> str:
+    """SHA-256 hash of all summary files in a meeting (first 16 hex chars).
+
+    Summaries are sorted by name and concatenated before hashing,
+    so the hash is stable regardless of filesystem ordering.
+    """
+    summaries = list_meeting_summaries(meeting_dir)
+    if not summaries:
+        return ""
+    combined = b"".join(s.read_bytes() for s in summaries)
+    return hashlib.sha256(combined).hexdigest()[:16]
 
 
 # ── Index helpers ─────────────────────────────────────────────────────
