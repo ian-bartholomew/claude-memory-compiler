@@ -76,6 +76,7 @@ LEARNING_DIR = WIKI_DIR / "learning"
 QA_DIR = WIKI_DIR / "qa"
 CONNECTIONS_DIR = WIKI_DIR / "connections"
 INDEXES_DIR = WIKI_DIR / "_indexes"
+MEETINGS_DIR = VAULT_DIR / "meetings"
 
 # Article subdirectories to scan — external vault has more folders
 if _is_external_vault:
