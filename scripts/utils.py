@@ -60,11 +60,22 @@ def extract_wikilinks(content: str) -> list[str]:
     return re.findall(r"\[\[([^\]]+)\]\]", content)
 
 
+def _normalize_wikilink(link: str) -> str:
+    """Strip display text (|...) and heading anchors (#...) from a wikilink."""
+    link = link.split("|")[0]   # [[slug|display text]] → slug
+    link = link.split("#")[0]   # [[slug#Heading]] → slug
+    return link.strip()
+
+
 def wiki_article_exists(link: str) -> bool:
     """Check if a wikilinked article exists on disk.
 
-    Handles both bare links ([[slug]]) and path-prefixed links ([[concepts/slug]]).
+    Handles bare links ([[slug]]), path-prefixed links ([[concepts/slug]]),
+    display text ([[slug|text]]), and heading anchors ([[slug#Heading]]).
     """
+    link = _normalize_wikilink(link)
+    if not link:
+        return True  # bare anchor like [[#Heading]] refers to same file
     # Try direct path first (path-prefixed link like concepts/slug)
     if (WIKI_DIR / f"{link}.md").exists():
         return True
@@ -78,6 +89,9 @@ def wiki_article_exists(link: str) -> bool:
 
 def find_article_path(link: str) -> Path | None:
     """Find the actual file path for a wikilink. Returns None if not found."""
+    link = _normalize_wikilink(link)
+    if not link:
+        return None
     # Try direct path first
     direct = WIKI_DIR / f"{link}.md"
     if direct.exists():

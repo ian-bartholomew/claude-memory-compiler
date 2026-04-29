@@ -17,6 +17,7 @@ from pathlib import Path
 
 from config import REPORTS_DIR, VAULT_DIR, WIKI_DIR, _is_external_vault, now_iso, today_iso
 from utils import (
+    _normalize_wikilink,
     count_inbound_links,
     extract_wikilinks,
     file_hash,
@@ -37,11 +38,10 @@ def check_broken_links() -> list[dict]:
     for article in list_wiki_articles():
         content = article.read_text(encoding="utf-8")
         rel = article.relative_to(WIKI_DIR)
-        for link in extract_wikilinks(content):
-            if link.startswith("daily/"):
-                continue  # daily log references are valid
-            if link.startswith("raw/"):
-                continue  # raw source references are valid
+        for raw_link in extract_wikilinks(content):
+            link = _normalize_wikilink(raw_link)
+            if not link or link.startswith("daily/") or link.startswith("raw/"):
+                continue
             if (WIKI_DIR / "_indexes" / f"{link}.md").exists():
                 continue  # domain index names (e.g. sre, engineering)
             if not wiki_article_exists(link):
@@ -121,8 +121,9 @@ def check_missing_backlinks() -> list[dict]:
         else:
             source_link = str(rel).replace(".md", "").replace("\\", "/")
 
-        for link in extract_wikilinks(content):
-            if link.startswith("daily/"):
+        for raw_link in extract_wikilinks(content):
+            link = _normalize_wikilink(raw_link)
+            if not link or link.startswith("daily/") or link.startswith("raw/"):
                 continue
             target_path = find_article_path(link)
             if target_path is not None and target_path.exists():
