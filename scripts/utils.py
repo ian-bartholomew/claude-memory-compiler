@@ -7,12 +7,15 @@ from pathlib import Path
 
 from config import (
     ARTICLE_SUBDIRS,
+    CLIPPINGS_DIR,
     DAILY_DIR,
+    DOCS_DIR,
     INDEX_FILE,
     INDEXES_DIR,
     LOG_FILE,
     MEETINGS_DIR,
     STATE_FILE,
+    SUPPORT_LEARNINGS_DIR,
     WIKI_DIR,
     _is_external_vault,
 )
@@ -148,6 +151,27 @@ def list_raw_files() -> list[Path]:
     if not DAILY_DIR.exists():
         return []
     return sorted(DAILY_DIR.glob("*.md"))
+
+
+def list_clippings() -> list[Path]:
+    """List all web clipping files."""
+    if not CLIPPINGS_DIR.exists():
+        return []
+    return sorted(CLIPPINGS_DIR.glob("*.md"))
+
+
+def list_support_learnings() -> list[Path]:
+    """List all support learnings files (excludes _metadata.yml)."""
+    if not SUPPORT_LEARNINGS_DIR.exists():
+        return []
+    return sorted(f for f in SUPPORT_LEARNINGS_DIR.glob("*.md"))
+
+
+def list_docs() -> list[Path]:
+    """List all doc files."""
+    if not DOCS_DIR.exists():
+        return []
+    return sorted(DOCS_DIR.glob("*.md"))
 
 
 # ── Meeting helpers ──────────────────────────────────────────────────

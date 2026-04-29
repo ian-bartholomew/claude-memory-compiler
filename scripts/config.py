@@ -58,13 +58,20 @@ _is_external_vault = VAULT_DIR != COMPILER_DIR
 if _is_external_vault:
     # External vault uses the Karpathy three-layer architecture:
     #   raw/   (source)  →  wiki/  (compiled)  →  projects/  (active work)
-    # Daily conversation logs are raw source material, so they go in raw/daily/.
-    DAILY_DIR = VAULT_DIR / "raw" / "daily"
+    RAW_DIR = VAULT_DIR / "raw"
+    DAILY_DIR = RAW_DIR / "daily"
+    CLIPPINGS_DIR = RAW_DIR / "clippings"
+    SUPPORT_LEARNINGS_DIR = RAW_DIR / "support_learnings"
+    DOCS_DIR = RAW_DIR / "docs"
     WIKI_DIR = VAULT_DIR / "wiki"
     INDEX_FILE = WIKI_DIR / "_index.md"
     LOG_FILE = WIKI_DIR / "_log.md"
 else:
+    RAW_DIR = VAULT_DIR
     DAILY_DIR = VAULT_DIR / "daily"
+    CLIPPINGS_DIR = VAULT_DIR / "clippings"
+    SUPPORT_LEARNINGS_DIR = VAULT_DIR / "support_learnings"
+    DOCS_DIR = VAULT_DIR / "docs"
     WIKI_DIR = VAULT_DIR / "knowledge"
     INDEX_FILE = WIKI_DIR / "index.md"
     LOG_FILE = WIKI_DIR / "log.md"
