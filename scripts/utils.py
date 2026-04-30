@@ -9,6 +9,7 @@ from config import (
     ARTICLE_SUBDIRS,
     CLIPPINGS_DIR,
     DAILY_DIR,
+    DAILY_NOTES_DIR,
     DOCS_DIR,
     INTERNAL_LEARNINGS_DIR,
     INDEX_FILE,
@@ -180,6 +181,13 @@ def list_support_learnings() -> list[Path]:
     if not SUPPORT_LEARNINGS_DIR.exists():
         return []
     return sorted(f for f in SUPPORT_LEARNINGS_DIR.glob("*.md"))
+
+
+def list_daily_notes() -> list[Path]:
+    """List all daily notes files (handles nested YYYY/MM/ structure)."""
+    if not DAILY_NOTES_DIR.exists():
+        return []
+    return sorted(DAILY_NOTES_DIR.rglob("*.md"))
 
 
 def list_internal_learnings() -> list[Path]:

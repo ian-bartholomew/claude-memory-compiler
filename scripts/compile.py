@@ -28,6 +28,7 @@ from config import (
     CLIPPINGS_DIR,
     COMPILER_DIR,
     DAILY_DIR,
+    DAILY_NOTES_DIR,
     DOCS_DIR,
     INDEX_FILE,
     INDEXES_DIR,
@@ -44,6 +45,7 @@ from config import (
 from utils import (
     file_hash,
     list_clippings,
+    list_daily_notes,
     list_docs,
     list_internal_learnings,
     list_raw_files,
@@ -68,6 +70,19 @@ SOURCE_TYPES = {
             "Extract key decisions, lessons learned, patterns, gotchas, and technical concepts "
             "from this conversation log. Focus on actionable knowledge that would help someone "
             "working on similar tasks."
+        ),
+    },
+    "daily_notes": {
+        "dir": DAILY_NOTES_DIR,
+        "list_fn": list_daily_notes,
+        "state_key": "daily_notes_ingested",
+        "label": "daily notes",
+        "description": "a brief work note, Slack message, or operational observation",
+        "instructions": (
+            "Extract any actionable knowledge from this brief note. These are typically "
+            "short operational observations, FYIs, or decisions. Update existing articles "
+            "if the note adds context to a known topic. Only create new articles if the "
+            "note introduces a genuinely new concept."
         ),
     },
     "clippings": {
