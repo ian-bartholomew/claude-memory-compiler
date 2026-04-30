@@ -31,6 +31,7 @@ from config import (
     DOCS_DIR,
     INDEX_FILE,
     INDEXES_DIR,
+    INTERNAL_LEARNINGS_DIR,
     LOG_FILE,
     RAW_DIR,
     SUPPORT_LEARNINGS_DIR,
@@ -44,6 +45,7 @@ from utils import (
     file_hash,
     list_clippings,
     list_docs,
+    list_internal_learnings,
     list_raw_files,
     list_support_learnings,
     list_wiki_articles,
@@ -95,6 +97,20 @@ SOURCE_TYPES = {
             "into another). Focus on the 'Learning' sections — these contain the distilled "
             "operational wisdom. Create company/ articles for org-specific patterns and "
             "concepts/ or guides/ articles for general technical knowledge."
+        ),
+    },
+    "internal_learnings": {
+        "dir": INTERNAL_LEARNINGS_DIR,
+        "list_fn": list_internal_learnings,
+        "state_key": "internal_learnings_ingested",
+        "label": "internal learnings",
+        "description": "a collection of internal team channel threads with summaries and takeaways",
+        "instructions": (
+            "Extract technical knowledge, architectural decisions, and team conventions "
+            "from these internal discussions. Focus on the 'Takeaway' sections — these "
+            "contain the distilled insights. Create company/ articles for org-specific "
+            "patterns, concepts/ for technical knowledge, and guides/ for workflows or "
+            "processes that were discussed."
         ),
     },
     "docs": {

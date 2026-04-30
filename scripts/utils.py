@@ -10,6 +10,7 @@ from config import (
     CLIPPINGS_DIR,
     DAILY_DIR,
     DOCS_DIR,
+    INTERNAL_LEARNINGS_DIR,
     INDEX_FILE,
     INDEXES_DIR,
     LOG_FILE,
@@ -179,6 +180,13 @@ def list_support_learnings() -> list[Path]:
     if not SUPPORT_LEARNINGS_DIR.exists():
         return []
     return sorted(f for f in SUPPORT_LEARNINGS_DIR.glob("*.md"))
+
+
+def list_internal_learnings() -> list[Path]:
+    """List all internal learnings files (excludes _metadata.yml)."""
+    if not INTERNAL_LEARNINGS_DIR.exists():
+        return []
+    return sorted(f for f in INTERNAL_LEARNINGS_DIR.glob("*.md"))
 
 
 def list_docs() -> list[Path]:
