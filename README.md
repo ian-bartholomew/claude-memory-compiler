@@ -2,7 +2,7 @@
 
 **Your AI conversations compile themselves into a searchable knowledge base.**
 
-Adapted from [Karpathy's LLM Knowledge Base](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) architecture, but instead of clipping web articles, the raw data is your own conversations with Claude Code. When a session ends (or auto-compacts mid-session), Claude Code hooks capture the conversation transcript and spawn a background process that uses the [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk) to extract the important stuff - decisions, lessons learned, patterns, gotchas - and appends it to a daily log. You then compile those daily logs into structured, cross-referenced knowledge articles organized by concept. Retrieval uses a simple index file instead of RAG - no vector database, no embeddings, just markdown.
+Adapted from [Karpathy's LLM Knowledge Base](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) architecture. Raw sources — daily conversation logs, web clippings, support threads, internal team discussions, docs, and meeting notes — are compiled by an LLM into structured, cross-referenced wiki articles. Claude Code hooks automatically capture your AI conversations into daily logs; you can also add web clippings (via Obsidian Web Clipper), support learnings, internal learnings, and documents to the `raw/` directory. The compiler processes all source types with source-specific instructions. Retrieval uses a simple index file instead of RAG - no vector database, no embeddings, just markdown.
 
 Anthropic has clarified that personal use of the Claude Agent SDK is covered under your existing Claude subscription (Max, Team, or Enterprise) - no separate API credits needed. Unlike OpenClaw, which requires API billing for its memory flush, this runs on your subscription.
 
@@ -48,10 +48,10 @@ The environment variable takes precedence over the config file if both are set.
 
 ### Vault setup
 
-Your vault needs a `daily/` directory for conversation logs. Create it if it does not already exist:
+Your vault needs a `raw/` directory structure for sources. Create it if it does not already exist:
 
 ```bash
-mkdir -p ~/path/to/your/obsidian-vault/daily
+mkdir -p ~/path/to/your/obsidian-vault/raw/{daily,daily_notes,clippings,support_learnings,internal_learnings,docs}
 ```
 
 The compiler will automatically create the `wiki/` directory and its subdirectories (`concepts/`, `guides/`, `company/`, `learning/`, `qa/`, `_indexes/`) the first time it runs.
@@ -60,7 +60,7 @@ The compiler will automatically create the `wiki/` directory and its subdirector
 
 | | Clone into project (default) | External vault |
 |---|---|---|
-| Daily logs | `daily/` in repo | `daily/` in vault |
+| Raw sources | `daily/` in repo | `raw/daily/`, `raw/clippings/`, etc. in vault |
 | Compiled articles | `knowledge/` | `wiki/` |
 | Index file | `knowledge/index.md` | `wiki/_index.md` |
 | Article categories | concepts, connections, qa | concepts, guides, company, learning, qa |
@@ -118,7 +118,7 @@ Replace `/absolute/path/to/claude-memory-compiler` with the actual path where yo
 
 ```
 Conversation -> SessionEnd/PreCompact hooks -> flush.py extracts knowledge
-    -> daily/YYYY-MM-DD.md -> compile.py -> wiki/concepts/, guides/, qa/
+    -> raw/daily/YYYY-MM-DD.md -> compile.py -> wiki/concepts/, guides/, company/
         -> SessionStart hook injects index into next session -> cycle repeats
 ```
 
@@ -126,20 +126,45 @@ Paths adapt based on vault configuration: with an external vault the compiler wr
 
 - **Hooks** capture conversations automatically (session end + pre-compaction safety net)
 - **flush.py** calls the Claude Agent SDK to decide what's worth saving, and after 6 PM triggers end-of-day compilation automatically
-- **compile.py** turns daily logs into organized concept articles with cross-references (triggered automatically or run manually)
+- **compile.py** compiles all raw source types (daily logs, clippings, support learnings, internal learnings, daily notes, docs, meetings) into organized wiki articles with cross-references
 - **query.py** answers questions using index-guided retrieval (no RAG needed at personal scale)
-- **lint.py** runs 7 health checks (broken links, orphans, contradictions, staleness)
+- **lint.py** runs structural health checks (broken links, orphans, missing backlinks, sparse articles, staleness, contradictions)
 
 ## Key Commands
 
 All commands are run from the compiler repo directory. Paths to daily logs and wiki articles adapt automatically based on your vault configuration.
 
 ```bash
-uv run python scripts/compile.py                    # compile new daily logs
-uv run python scripts/query.py "question"            # ask the knowledge base
-uv run python scripts/query.py "question" --file-back # ask + save answer back
-uv run python scripts/lint.py                        # run health checks
-uv run python scripts/lint.py --structural-only      # free structural checks only
+# Compile all new/changed sources across all source types
+uv run python scripts/compile.py
+
+# Compile a specific source type
+uv run python scripts/compile.py --source daily
+uv run python scripts/compile.py --source clippings
+uv run python scripts/compile.py --source support_learnings
+uv run python scripts/compile.py --source internal_learnings
+uv run python scripts/compile.py --source daily_notes
+uv run python scripts/compile.py --source docs
+
+# Compile a specific file (auto-detects source type)
+uv run python scripts/compile.py --file raw/clippings/my-article.md
+
+# Preview what would be compiled
+uv run python scripts/compile.py --dry-run
+
+# Force recompile everything
+uv run python scripts/compile.py --all
+
+# Compile meetings (separate script)
+uv run python scripts/compile-meetings.py
+
+# Query the knowledge base
+uv run python scripts/query.py "question"
+uv run python scripts/query.py "question" --file-back
+
+# Health checks
+uv run python scripts/lint.py                        # all checks (LLM contradiction check costs money)
+uv run python scripts/lint.py --structural-only      # structural checks only (free, fast)
 ```
 
 ## Why No RAG?

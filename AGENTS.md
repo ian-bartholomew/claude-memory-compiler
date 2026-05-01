@@ -1,20 +1,19 @@
 # AGENTS.md - Personal Knowledge Base Compiler Schema
 
 > Adapted from [Andrej Karpathy's LLM Knowledge Base](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) architecture.
-> Instead of ingesting external articles, this system compiles knowledge from your own AI conversations into an Obsidian vault.
+> This system compiles knowledge from multiple raw source types — AI conversations, web clippings, support threads, internal team discussions, docs, and meetings — into an Obsidian vault.
 
 ## The Compiler Analogy
 
 ```
-daily/          = source code    (your conversations - the raw material)
-raw/            = libraries      (external sources - web clips, RFCs, docs)
+raw/            = source code    (all raw sources - conversations, clips, docs, learnings)
 LLM             = compiler       (extracts and organizes knowledge)
 wiki/           = executable     (structured, queryable knowledge base)
 lint            = test suite     (health checks for consistency)
 queries         = runtime        (using the knowledge)
 ```
 
-You don't manually organize your knowledge. You have conversations, curate sources, and the LLM handles the synthesis, cross-referencing, and maintenance.
+You don't manually organize your knowledge. You have conversations, clip articles, capture learnings, and the LLM handles the synthesis, cross-referencing, and maintenance.
 
 The **compiler repo** (`claude-memory-compiler/`) contains the code — scripts, hooks, and this schema. The **vault** (`~/Documents/Work/`) contains the data — daily logs, raw sources, and compiled wiki articles. They are separate repositories connected by configuration.
 
@@ -32,10 +31,14 @@ claude-memory-compiler/        # The compiler (code)
 └── pyproject.toml             # Dependencies
 
 ~/Documents/Work/              # The vault (data) — an Obsidian vault
-├── daily/                     # Layer 1: conversation logs
-├── raw/                       # External source documents (user-owned)
-│   ├── clippings/             #   Web clips, tweets, articles
-│   └── docs/                  #   RFCs, whitepapers, internal docs
+├── raw/                       # Layer 1: all raw sources (user-owned, immutable)
+│   ├── daily/                 #   AI conversation session logs (captured by hooks)
+│   ├── daily_notes/           #   Brief work notes (nested YYYY/MM/ structure)
+│   ├── clippings/             #   Web clips, tweets, articles (via Obsidian Web Clipper)
+│   ├── support_learnings/     #   Support channel problem/resolution summaries
+│   ├── internal_learnings/    #   Internal team channel threads and takeaways
+│   ├── docs/                  #   RFCs, proposals, technical write-ups
+│   └── repos/                 #   Reserved for repository-related content
 ├── wiki/                      # Layer 2: compiled knowledge (LLM-owned)
 ├── projects/                  # Active project workspaces
 ├── meetings/                  # Meeting recordings and transcripts
@@ -43,12 +46,23 @@ claude-memory-compiler/        # The compiler (code)
 └── archive/                   # Completed projects, stale content
 ```
 
-### Layer 1: `daily/` - Conversation Logs (Immutable Source)
+### Layer 1: `raw/` - Source Material (Immutable)
 
-Daily logs capture what happened in your AI coding sessions. These are the "raw sources" — append-only, never edited after the fact. They live in the vault, not the compiler repo.
+All raw sources live under `raw/` in the vault. These are append-only — never edited after creation. The compiler processes all subdirectories with source-type-specific instructions.
+
+| Subdirectory | Content | How it arrives |
+|---|---|---|
+| `raw/daily/` | AI conversation session logs | Automatically via Claude Code hooks |
+| `raw/daily_notes/` | Brief work notes, observations | Manually added (nested `YYYY/MM/` dirs) |
+| `raw/clippings/` | Web articles, blog posts, tweets | Obsidian Web Clipper or manually |
+| `raw/support_learnings/` | Support channel thread summaries | `/support-learnings` skill or manually |
+| `raw/internal_learnings/` | Internal team channel discussions | `/internal-channel-learnings` skill or manually |
+| `raw/docs/` | Proposals, RFCs, technical write-ups | Manually added |
+
+Daily logs follow this format:
 
 ```
-~/Documents/Work/daily/
+~/Documents/Work/raw/daily/
 ├── 2026-04-01.md
 ├── 2026-04-02.md
 ├── ...
@@ -499,9 +513,10 @@ claude-memory-compiler/                  # Compiler repo (code)
 ├── README.md                            # Concise overview + quick start
 ├── pyproject.toml                       # Dependencies (at root so hooks can find it)
 ├── scripts/                             # CLI tools
-│   ├── compile.py                       #   Compile daily logs -> wiki articles
+│   ├── compile.py                       #   Compile all raw sources -> wiki articles
+│   ├── compile-meetings.py              #   Compile meeting summaries -> wiki articles
 │   ├── query.py                         #   Ask questions (index-guided, no RAG)
-│   ├── lint.py                          #   7 health checks
+│   ├── lint.py                          #   Structural + LLM health checks
 │   ├── flush.py                         #   Extract memories from conversations
 │   ├── config.py                        #   Path constants + vault resolution
 │   ├── utils.py                         #   Shared helpers
@@ -514,12 +529,14 @@ claude-memory-compiler/                  # Compiler repo (code)
 └── reports/                             # Lint reports (gitignored)
 
 ~/Documents/Work/                        # Obsidian vault (data)
-├── daily/                               # Layer 1: conversation logs (immutable)
-│   ├── 2026-04-01.md
-│   └── ...
-├── raw/                                 # External sources (user-owned, immutable)
+├── raw/                                 # Layer 1: all raw sources (immutable)
+│   ├── daily/                           #   AI conversation session logs
+│   ├── daily_notes/                     #   Brief work notes (nested YYYY/MM/)
 │   ├── clippings/                       #   Web clips, articles
-│   └── docs/                            #   RFCs, whitepapers
+│   ├── support_learnings/               #   Support channel thread summaries
+│   ├── internal_learnings/              #   Internal team channel threads
+│   ├── docs/                            #   RFCs, proposals, write-ups
+│   └── repos/                           #   Reserved
 ├── wiki/                                # Layer 2: compiled knowledge (LLM-owned)
 │   ├── _index.md                        #   Master catalog
 │   ├── _log.md                          #   Append-only activity record
