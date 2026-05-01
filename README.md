@@ -167,6 +167,27 @@ uv run python scripts/lint.py                        # all checks (LLM contradic
 uv run python scripts/lint.py --structural-only      # structural checks only (free, fast)
 ```
 
+## Claude Code Skills (lyt-assistant plugin)
+
+If you use the [lyt-assistant](https://github.com/ian-bartholomew/lyt-assistant) plugin, these skills provide interactive compilation with quality gates — an alternative to running the Python scripts directly.
+
+| Skill | Purpose |
+|-------|---------|
+| `/compile` | Full pipeline: ingest unprocessed sources → validate new articles → discover missing links. The primary entry point. |
+| `/compile clippings` | Scope compilation to a single source type (`daily`, `clippings`, `support_learnings`, `internal_learnings`, `daily_notes`, `docs`). |
+| `/ingest` | Process raw sources into wiki articles with interactive review — dedup checks, source-type-specific guidance, reciprocal linking, post-compilation validation. |
+| `/lint` | Run `lint.py` for structural checks, then layer on additional checks (maturity/confidence audit, duplicate detection, source attribution quality). Interactive fixes. |
+| `/discover-links` | Find missing connections between wiki articles and add bidirectional `related:` links. |
+
+**Recommended workflow:**
+
+```
+Morning:           /compile                 # processes yesterday's sources
+After clipping:    /compile clippings       # immediate, while context is fresh
+Weekly:            /lint                    # full wiki health check
+                   /discover-links          # if lint found orphans or gaps
+```
+
 ## Why No RAG?
 
 Karpathy's insight: at personal scale (50-500 articles), the LLM reading a structured `index.md` outperforms vector similarity. The LLM understands what you're really asking; cosine similarity just finds similar words. RAG becomes necessary at ~2,000+ articles when the index exceeds the context window.
